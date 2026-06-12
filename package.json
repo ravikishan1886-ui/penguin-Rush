@@ -1,8 +1,22 @@
 {
-  "name": "react-example",
+  "name": "penguin-rush-frozen-city",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
+  "description": "An action-packed 2.5D winter skateboarding endless runner featuring procedural synth-pop, upgrades, and epic boss battles.",
   "type": "module",
+  "author": "Penguin Rush Team",
+  "license": "MIT",
+  "keywords": [
+    "penguin",
+    "skateboarding",
+    "endless-runner",
+    "web-audio-api",
+    "canvas",
+    "game",
+    "vite",
+    "react",
+    "typescript"
+  ],
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
