@@ -1,0 +1,6 @@
+{
+  "name": "Penguin Rush: Frozen City",
+  "description": "An action-packed 2.5D winter skateboarding endless runner with high-performance graphics, boss battles, upgrades, and neon aesthetics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
