@@ -9,6 +9,7 @@ import UIOverlay from './components/UIOverlay';
 import { GameState, Difficulty, SaveData, PowerUpType } from './types';
 import { loadSaveData, saveSaveData } from './utils/gameData';
 import { gameAudio } from './components/AudioSystem';
+import { platformSdk } from './utils/platformSdk';
 import { Activity, Coins, Award, Compass, RefreshCw, Volume2, VolumeX, Shield, Play, Pause, Zap, Sword, HelpCircle, Settings, RotateCw } from 'lucide-react';
 
 export default function App() {
@@ -72,6 +73,10 @@ export default function App() {
     setSaveData(data);
     setDifficulty('medium');
     setMuted(gameAudio.getMuted());
+    // Auto initiate the Active Platform SDK
+    platformSdk.init().catch(err => {
+      console.warn("Platform SDK failed to load asynchronously:", err);
+    });
   }, []);
 
   // Keyboard monitoring for Pause State
@@ -123,12 +128,15 @@ export default function App() {
     setIsPaused(false);
     setGameState('playing');
     setLastResults(null);
+    platformSdk.gameplayStart();
   };
 
   // Callback when crash is hit (GAME OVER)
   const handleGameOver = (finalScore: number, finalDistance: number, collectedCoins: number) => {
     setGameState('gameover');
     setLastResults({ score: finalScore, distance: finalDistance, coins: collectedCoins });
+    platformSdk.gameplayStop();
+    platformSdk.submitScore(finalScore);
 
     // Update global resources & save
     const updatedCoins = saveData.coins + collectedCoins;
@@ -181,6 +189,8 @@ export default function App() {
   const handleVictory = (finalScore: number, finalDistance: number, collectedCoins: number) => {
     setGameState('victory');
     setLastResults({ score: finalScore, distance: finalDistance, coins: collectedCoins });
+    platformSdk.gameplayStop();
+    platformSdk.submitScore(finalScore);
 
     // Add extra 100 completion coin reward!
     const updatedCoins = saveData.coins + collectedCoins + 100;

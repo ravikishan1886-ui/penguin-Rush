@@ -3,11 +3,12 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { GameState, Difficulty, Skin, Skateboard, LeaderboardEntry, Achievement, DailyChallenge, SaveData } from '../types';
-import { Play, Trophy, ShoppingBag, Award, Volume2, VolumeX, Sparkles, RefreshCw, X, Shield, Zap, Flame, Compass, Coins, CircleCheck, Music, SkipForward } from 'lucide-react';
+import { Play, Trophy, ShoppingBag, Award, Volume2, VolumeX, Sparkles, RefreshCw, X, Shield, Zap, Flame, Compass, Coins, CircleCheck, Music, SkipForward, Tv, Video, Gamepad2, Gift } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { gameAudio } from './AudioSystem';
+import { platformSdk, GamePlatform } from '../utils/platformSdk';
 
 interface UIOverlayProps {
   gameState: GameState;
@@ -52,6 +53,90 @@ export default function UIOverlay({
   const [shopCategory, setShopCategory] = useState<'skins' | 'skateboards'>('skins');
   const [playerNameInput, setPlayerNameInput] = useState('SkaterPenguin');
   const [currentTrackIndex, setCurrentTrackIndex] = useState(gameAudio.getCurrentTrackIndex());
+
+  const [platform, setPlatform] = useState<GamePlatform>(platformSdk.getPlatform());
+  const [isAdPlaying, setIsAdPlaying] = useState(false);
+  const [adSuccessMessage, setAdSuccessMessage] = useState<string | null>(null);
+
+  // Sync state initially
+  useEffect(() => {
+    setPlatform(platformSdk.getPlatform());
+  }, []);
+
+  const handleSelectPlatform = (selected: GamePlatform) => {
+    platformSdk.setPlatformPreference(selected);
+    setPlatform(selected);
+  };
+
+  const handleWatchAdDirectCoins = () => {
+    setIsAdPlaying(true);
+    setAdSuccessMessage(null);
+    const wasMuted = gameAudio.getMuted();
+    if (!wasMuted) gameAudio.setMute(true);
+
+    platformSdk.showRewardedAd(
+      () => {
+        console.log('[UIOverlay] Rewarded Ad Commercial Started');
+      },
+      () => {
+        setIsAdPlaying(false);
+        if (!wasMuted) gameAudio.setMute(false);
+
+        const updatedCoins = saveData.coins + 100;
+        const newData = {
+          ...saveData,
+          coins: updatedCoins
+        };
+        setSaveData(newData);
+        localStorage.setItem('penguin_rush_save_data', JSON.stringify(newData));
+
+        setAdSuccessMessage('🪙 +100 BONUSES EARNED COMPLIMENTS OF PLATFORM SDK!');
+        setTimeout(() => setAdSuccessMessage(null), 4500);
+      },
+      () => {
+        setIsAdPlaying(false);
+        if (!wasMuted) gameAudio.setMute(false);
+        setAdSuccessMessage('⚠️ SPONSOR CAMPAIGN PREEMPTED OR FAILING');
+        setTimeout(() => setAdSuccessMessage(null), 3000);
+      }
+    );
+  };
+
+  const handleDoubleCoinsAd = () => {
+    if (!lastResults) return;
+    setIsAdPlaying(true);
+    setAdSuccessMessage(null);
+    const wasMuted = gameAudio.getMuted();
+    if (!wasMuted) gameAudio.setMute(true);
+
+    platformSdk.showRewardedAd(
+      () => {
+        console.log('[UIOverlay] Double Coins Reward Sequence Triggered');
+      },
+      () => {
+        setIsAdPlaying(false);
+        if (!wasMuted) gameAudio.setMute(false);
+
+        const bonus = lastResults.coins; // double rewards!
+        const updatedCoins = saveData.coins + bonus;
+        const newData = {
+          ...saveData,
+          coins: updatedCoins
+        };
+        setSaveData(newData);
+        localStorage.setItem('penguin_rush_save_data', JSON.stringify(newData));
+
+        setAdSuccessMessage(`🪙 +${bonus} EXTRA FISH COINS CLAIMED SUCCESSFULLY!`);
+        setTimeout(() => setAdSuccessMessage(null), 4500);
+      },
+      () => {
+        setIsAdPlaying(false);
+        if (!wasMuted) gameAudio.setMute(false);
+        setAdSuccessMessage('⚠️ AD BLOCKED OR CANCELLED');
+        setTimeout(() => setAdSuccessMessage(null), 3500);
+      }
+    );
+  };
 
   const handleSelectTrack = (idx: number) => {
     gameAudio.selectTrack(idx);
@@ -174,6 +259,9 @@ export default function UIOverlay({
     e.preventDefault();
     if (!lastResults) return;
 
+    // Dispatch to the active platform's native highscore leaderboards
+    platformSdk.submitScore(lastResults.score);
+
     const newEntry: LeaderboardEntry = {
       name: playerNameInput.trim() || 'Anonymous',
       score: lastResults.score,
@@ -271,7 +359,7 @@ export default function UIOverlay({
                   <div className="bg-red-950/35 border border-red-900/30 rounded-xl p-4 my-2 text-center">
                     <p className="text-rose-400 text-sm font-semibold tracking-wider uppercase font-mono">⚡ CRASH LANDING ⚡</p>
                     <div className="grid grid-cols-3 gap-2 mt-2">
-                      <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
+                       <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
                         <span className="block text-[10px] text-slate-400 font-mono">SCORE</span>
                         <span className="text-lg font-bold font-mono text-cyan-300">{lastResults.score}</span>
                       </div>
@@ -285,7 +373,19 @@ export default function UIOverlay({
                       </div>
                     </div>
 
-                    <form onSubmit={handleSaveToLeaderboard} className="mt-3 flex items-center justify-center gap-2 max-w-sm mx-auto">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-3 max-w-sm mx-auto">
+                      <button
+                        onClick={handleDoubleCoinsAd}
+                        disabled={isAdPlaying || lastResults.coins === 0}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-white font-extrabold text-xs font-mono tracking-widest py-2 px-3 rounded-xl border border-yellow-300/30 hover:scale-[1.02] transition cursor-pointer"
+                        title="Double your runway coins with a short sponsor message"
+                      >
+                        <Video className="h-4 w-4 text-white animate-pulse" />
+                        <span>DOUBLE COINS (+{lastResults.coins})</span>
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveToLeaderboard} className="mt-4 flex items-center justify-center gap-2 max-w-sm mx-auto">
                       <input
                         type="text"
                         maxLength={14}
@@ -323,7 +423,19 @@ export default function UIOverlay({
                       </div>
                     </div>
 
-                    <form onSubmit={handleSaveToLeaderboard} className="mt-3 flex items-center justify-center gap-2 max-w-sm mx-auto">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-3 max-w-sm mx-auto">
+                      <button
+                        onClick={handleDoubleCoinsAd}
+                        disabled={isAdPlaying || lastResults.coins === 0}
+                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-white font-extrabold text-xs font-mono tracking-widest py-2 px-3 rounded-xl border border-yellow-300/30 hover:scale-[1.02] transition cursor-pointer"
+                        title="Double your runway reward with a short sponsor message"
+                      >
+                        <Video className="h-4 w-4 text-white animate-pulse" />
+                        <span>DOUBLE REWARDS (+{lastResults.coins})</span>
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleSaveToLeaderboard} className="mt-4 flex items-center justify-center gap-2 max-w-sm mx-auto">
                       <input
                         type="text"
                         maxLength={14}
@@ -522,6 +634,51 @@ export default function UIOverlay({
                     <span className="text-xs font-semibold text-amber-300 font-sans flex items-center gap-1.5 justify-end">
                       🛹 {saveData.skateboards.find(b => b.id === saveData.selectedSkateboard)?.name}
                     </span>
+                  </div>
+                </div>
+
+                {/* PLATFORM SDK INTEGRATION SIMULATOR RAIL */}
+                <div className="mt-4 p-4 rounded-xl border border-dashed border-sky-800/40 bg-slate-900/30">
+                  <div className="flex items-center justify-between mb-2 select-none">
+                    <span className="text-[10px] text-cyan-300 font-mono tracking-wider uppercase flex items-center gap-1.5 font-bold">
+                      <Gamepad2 className="h-3.5 w-3.5 text-cyan-400" />
+                      PLATFORM SDK PORTAL
+                    </span>
+                    <span className="text-[9px] font-mono text-slate-500">
+                      MONETIZATION CONTEXT
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
+                    Test monetization hooks. Integrates native <strong className="text-white">Poki</strong> and <strong className="text-white">CrazyGames</strong> SDK parameters automatically inside host iframes.
+                  </p>
+
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {(['offline', 'poki', 'crazygames'] as GamePlatform[]).map((plat) => (
+                      <button
+                        key={plat}
+                        onClick={() => handleSelectPlatform(plat)}
+                        className={`py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-widest uppercase border transition cursor-pointer ${
+                          platform === plat
+                            ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white border-sky-300 shadow shadow-sky-600/20'
+                            : 'bg-slate-950/80 text-slate-400 border-slate-900 hover:border-slate-850'
+                        }`}
+                      >
+                        {plat === 'offline' ? 'Sandbox' : plat === 'crazygames' ? 'CrazyGames' : 'Poki'}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between border-t border-sky-950/40 pt-2.5">
+                    <span className="text-[10px] text-slate-400 font-mono">REWARD AD UNIT:</span>
+                    <button
+                      onClick={handleWatchAdDirectCoins}
+                      disabled={isAdPlaying}
+                      className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-[10px] font-mono tracking-widest px-2.5 py-1.5 rounded-lg border border-indigo-400/30 cursor-pointer transition hover:scale-[1.02] shadow shadow-indigo-600/10"
+                    >
+                      <Tv className="h-3.5 w-3.5 text-indigo-300 animate-pulse" />
+                      <span>REWARD AD (+100 🪙)</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -855,6 +1012,55 @@ export default function UIOverlay({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* FULLSCREEN SPONSOR AD UNIT SIMULATION OVERLAY */}
+      {isAdPlaying && (
+        <div className="absolute inset-0 z-50 pointer-events-auto flex flex-col items-center justify-center bg-slate-950/98 backdrop-blur-md">
+          <div className="flex flex-col items-center gap-6 max-w-sm text-center p-8 select-none">
+            <div className="relative flex items-center justify-center h-20 w-20 rounded-full bg-indigo-500/10 border-2 border-indigo-500 shadow-lg shadow-indigo-500/20">
+              <Tv className="h-10 w-10 text-cyan-400 animate-bounce" />
+              <span className="absolute inset-0 rounded-full border border-indigo-400/20 animate-ping opacity-60" />
+            </div>
+
+            <div className="space-y-2 col-span-2">
+              <h3 className="text-xl font-bold font-display tracking-wider text-white">SPONSOR BROADCAST</h3>
+              <p className="text-[10px] text-slate-400 font-mono tracking-widest uppercase">AD UNIT STATUS: RETRIEVING CREATIVE...</p>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Thank you for supporting <strong>Penguin Rush</strong>! This brief ad allows us to fund high-performance cold runway expansions.
+              </p>
+            </div>
+
+            {/* Simulating ticking progress */}
+            <div className="w-48 h-1.5 rounded-full bg-slate-900 border border-slate-800 overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ duration: 2, ease: "linear" }}
+                className="h-full bg-gradient-to-r from-sky-400 to-indigo-500"
+              />
+            </div>
+
+            <span className="text-[10px] uppercase font-mono text-cyan-400 tracking-widest animate-pulse">Running Simulation...</span>
+          </div>
+        </div>
+      )}
+
+      {/* FLOAT ADS SUCCESS BANNER ALERT */}
+      {adSuccessMessage && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto w-full max-w-md px-4">
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="flex items-center gap-2.5 bg-slate-950/95 border border-amber-500/40 px-4 py-3 rounded-xl text-center shadow-2xl shadow-amber-500/10 backdrop-blur-md"
+          >
+            <Gift className="h-5 w-5 text-amber-400 shrink-0 animate-bounce" />
+            <span className="text-xs font-bold font-mono text-amber-300 tracking-wider flex-1 text-left">
+              {adSuccessMessage}
+            </span>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
