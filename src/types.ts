@@ -123,4 +123,6 @@ export interface SaveData {
   achievements: Achievement[];
   dailyChallenges: DailyChallenge[];
   lastChallengeReset: number;
+  lastLoginClaimTime?: number;
+  dailyLoginStreak?: number;
 }

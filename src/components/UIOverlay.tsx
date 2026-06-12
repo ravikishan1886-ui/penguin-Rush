@@ -57,6 +57,7 @@ export default function UIOverlay({
   const [platform, setPlatform] = useState<GamePlatform>(platformSdk.getPlatform());
   const [isAdPlaying, setIsAdPlaying] = useState(false);
   const [adSuccessMessage, setAdSuccessMessage] = useState<string | null>(null);
+  const [dailySuccessMsg, setDailySuccessMsg] = useState<string | null>(null);
 
   // Sync state initially
   useEffect(() => {
@@ -252,6 +253,38 @@ export default function UIOverlay({
     };
     setSaveData(newData);
     localStorage.setItem('penguin_rush_save_data', JSON.stringify(newData));
+  };
+
+  // Claim Daily Login Reward Calendar
+  const handleClaimDailyReward = () => {
+    const lastClaim = saveData.lastLoginClaimTime || 0;
+    const now = Date.now();
+    const timeSinceLastClaim = now - lastClaim;
+    const canClaim = lastClaim === 0 || timeSinceLastClaim >= 18 * 60 * 60 * 1000;
+    if (!canClaim) return;
+
+    const streakBroken = lastClaim > 0 && timeSinceLastClaim > 42 * 60 * 60 * 1000;
+    const nextStreak = streakBroken ? 1 : ((saveData.dailyLoginStreak || 0) % 5) + 1;
+
+    const rewards = [50, 120, 200, 350, 600];
+    const rewardAmt = rewards[(nextStreak - 1) % 5];
+
+    const updatedCoins = saveData.coins + rewardAmt;
+    const newData: SaveData = {
+      ...saveData,
+      coins: updatedCoins,
+      lastLoginClaimTime: now,
+      dailyLoginStreak: nextStreak,
+    };
+
+    setSaveData(newData);
+    localStorage.setItem('penguin_rush_save_data', JSON.stringify(newData));
+    gameAudio.playVictory();
+
+    setDailySuccessMsg(`🎁 Day ${nextStreak} Login claimed! Added 🪙 ${rewardAmt} Fish Coins!`);
+    setTimeout(() => {
+      setDailySuccessMsg(null);
+    }, 4500);
   };
 
   // Save score to leaderboard
@@ -455,6 +488,98 @@ export default function UIOverlay({
                   </div>
                 )}
 
+                {/* PORTFOLIO-GRADE CONSECUTIVE DAILY LOYALTY CALENDAR */}
+                {(() => {
+                  const lastClaim = saveData.lastLoginClaimTime || 0;
+                  const now = Date.now();
+                  const timeSinceLastClaim = now - lastClaim;
+
+                  const canClaim = lastClaim === 0 || timeSinceLastClaim >= 18 * 60 * 60 * 1000;
+                  const streakBroken = lastClaim > 0 && timeSinceLastClaim > 42 * 60 * 60 * 1000;
+
+                  const currentStreak = streakBroken ? 0 : (saveData.dailyLoginStreak || 0);
+                  const nextTargetClaimIndex = currentStreak % 5;
+
+                  const rewards = [50, 120, 200, 350, 600];
+
+                  let timeStr = "";
+                  if (!canClaim) {
+                    const msLeft = 18 * 60 * 60 * 1000 - timeSinceLastClaim;
+                    const hours = Math.floor(msLeft / (1000 * 60 * 60));
+                    const minutes = Math.floor((msLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    timeStr = `${hours}h ${minutes}m left`;
+                  }
+
+                  return (
+                    <div className="mt-2.5 p-3 rounded-xl bg-gradient-to-br from-indigo-950/20 to-slate-900/60 border border-cyan-500/15 backdrop-blur-sm shadow-md">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] text-cyan-300 font-mono tracking-widest uppercase flex items-center gap-1">
+                          <Gift className="h-3 w-3 text-cyan-400 animate-pulse" /> DAILY SKATE BONUSES
+                        </span>
+                        {canClaim ? (
+                          <span className="text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-1.5 py-0.5 rounded-full font-mono animate-pulse">
+                            READY!
+                          </span>
+                        ) : (
+                          <span className="text-[9px] bg-slate-950/60 text-slate-400 border border-slate-800 px-1.5 py-0.5 rounded-full font-mono">
+                            {timeStr}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-5 gap-1 mb-2">
+                        {rewards.map((reward, idx) => {
+                          const dayNum = idx + 1;
+                          const isClaimed = idx < currentStreak;
+                          const isActive = idx === nextTargetClaimIndex && canClaim;
+
+                          return (
+                            <div
+                              key={idx}
+                              className={`relative flex flex-col items-center justify-center py-1.5 px-0.5 rounded-lg transition-all duration-300 border ${
+                                isClaimed
+                                  ? 'bg-slate-950/40 border-slate-950 text-slate-500 line-through'
+                                  : isActive
+                                    ? 'bg-cyan-500/10 border-cyan-400 shadow-[0_0_8px_rgba(6,182,212,0.1)] text-cyan-300 scale-[1.02]'
+                                    : 'bg-slate-950/60 border-slate-900 text-slate-400'
+                              }`}
+                            >
+                              <span className="text-[7.5px] font-mono tracking-tighter uppercase select-none opacity-80">
+                                DAY {dayNum}
+                              </span>
+                              <span className="text-xs my-0.5 select-none font-sans">
+                                {isClaimed ? '✅' : idx === 4 ? '⭐️' : '🪙'}
+                              </span>
+                              <span className={`text-[9px] font-bold font-mono ${isActive ? 'text-cyan-200' : 'text-amber-400/90'}`}>
+                                {reward}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {canClaim ? (
+                        <button
+                          onClick={handleClaimDailyReward}
+                          className="w-full py-2 bg-gradient-to-r from-cyan-500 via-sky-400 to-indigo-500 hover:from-cyan-400 hover:to-indigo-400 text-white font-extrabold font-mono tracking-widest text-[10px] rounded-lg shadow-md cursor-pointer transition active:scale-95"
+                        >
+                          CLAIM REWARD (+{rewards[nextTargetClaimIndex]} COINS)
+                        </button>
+                      ) : (
+                        <div className="w-full py-1 bg-slate-1000/40 border border-slate-900 font-mono text-[8px] text-center text-slate-400 rounded-lg">
+                          Streak: <strong className="text-cyan-400">{currentStreak} days</strong> consecutive. Back in {timeStr}!
+                        </div>
+                      )}
+
+                      {dailySuccessMsg && (
+                        <div className="mt-1.5 text-[8.5px] font-extrabold font-mono text-center text-emerald-400 uppercase leading-none">
+                          {dailySuccessMsg}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
                 {/* MAIN MENU BUTTON PANEL */}
                 <div className="grid grid-cols-2 gap-4 mt-4">
                   {/* PLAY TRIGGER BUTTON */}
@@ -634,51 +759,6 @@ export default function UIOverlay({
                     <span className="text-xs font-semibold text-amber-300 font-sans flex items-center gap-1.5 justify-end">
                       🛹 {saveData.skateboards.find(b => b.id === saveData.selectedSkateboard)?.name}
                     </span>
-                  </div>
-                </div>
-
-                {/* PLATFORM SDK INTEGRATION SIMULATOR RAIL */}
-                <div className="mt-4 p-4 rounded-xl border border-dashed border-sky-800/40 bg-slate-900/30">
-                  <div className="flex items-center justify-between mb-2 select-none">
-                    <span className="text-[10px] text-cyan-300 font-mono tracking-wider uppercase flex items-center gap-1.5 font-bold">
-                      <Gamepad2 className="h-3.5 w-3.5 text-cyan-400" />
-                      PLATFORM SDK PORTAL
-                    </span>
-                    <span className="text-[9px] font-mono text-slate-500">
-                      MONETIZATION CONTEXT
-                    </span>
-                  </div>
-
-                  <p className="text-[11px] text-slate-400 leading-relaxed mb-3">
-                    Test monetization hooks. Integrates native <strong className="text-white">Poki</strong> and <strong className="text-white">CrazyGames</strong> SDK parameters automatically inside host iframes.
-                  </p>
-
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    {(['offline', 'poki', 'crazygames'] as GamePlatform[]).map((plat) => (
-                      <button
-                        key={plat}
-                        onClick={() => handleSelectPlatform(plat)}
-                        className={`py-1.5 rounded-lg text-[10px] font-bold font-mono tracking-widest uppercase border transition cursor-pointer ${
-                          platform === plat
-                            ? 'bg-gradient-to-r from-sky-500 to-indigo-500 text-white border-sky-300 shadow shadow-sky-600/20'
-                            : 'bg-slate-950/80 text-slate-400 border-slate-900 hover:border-slate-850'
-                        }`}
-                      >
-                        {plat === 'offline' ? 'Sandbox' : plat === 'crazygames' ? 'CrazyGames' : 'Poki'}
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center justify-between border-t border-sky-950/40 pt-2.5">
-                    <span className="text-[10px] text-slate-400 font-mono">REWARD AD UNIT:</span>
-                    <button
-                      onClick={handleWatchAdDirectCoins}
-                      disabled={isAdPlaying}
-                      className="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-[10px] font-mono tracking-widest px-2.5 py-1.5 rounded-lg border border-indigo-400/30 cursor-pointer transition hover:scale-[1.02] shadow shadow-indigo-600/10"
-                    >
-                      <Tv className="h-3.5 w-3.5 text-indigo-300 animate-pulse" />
-                      <span>REWARD AD (+100 🪙)</span>
-                    </button>
                   </div>
                 </div>
               </div>

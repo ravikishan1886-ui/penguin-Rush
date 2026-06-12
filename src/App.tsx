@@ -4,13 +4,22 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import GameCanvas from './components/GameCanvas';
 import UIOverlay from './components/UIOverlay';
 import { GameState, Difficulty, SaveData, PowerUpType } from './types';
 import { loadSaveData, saveSaveData } from './utils/gameData';
 import { gameAudio } from './components/AudioSystem';
 import { platformSdk } from './utils/platformSdk';
-import { Activity, Coins, Award, Compass, RefreshCw, Volume2, VolumeX, Shield, Play, Pause, Zap, Sword, HelpCircle, Settings, RotateCw } from 'lucide-react';
+import { Activity, Coins, Award, Compass, RefreshCw, Volume2, VolumeX, Shield, Play, Pause, Zap, Sword, HelpCircle, Settings, RotateCw, Trophy } from 'lucide-react';
+
+interface GameToast {
+  id: string;
+  title: string;
+  description: string;
+  rewardCoins?: number;
+  icon?: string;
+}
 
 export default function App() {
   const [saveData, setSaveData] = useState<SaveData | null>(null);
@@ -25,6 +34,18 @@ export default function App() {
   const [currentScore, setCurrentScore] = useState(0);
   const [bossHealth, setBossHealth] = useState(100);
   const [targetDistance, setTargetDistance] = useState<number>(1500); // selected target run distance (m) or -1 for endless
+
+  // Real-time toast notifications
+  const [toasts, setToasts] = useState<GameToast[]>([]);
+
+  const triggerToast = (title: string, description: string, rewardCoins?: number, icon = '🏆') => {
+    const id = Math.random().toString();
+    setToasts(prev => [...prev, { id, title, description, rewardCoins, icon }]);
+    gameAudio.playAchievementComplete();
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4200);
+  };
 
   // Keep tracking historic session outputs
   const [lastResults, setLastResults] = useState<{ score: number; distance: number; coins: number } | null>(null);
@@ -151,6 +172,10 @@ export default function App() {
       } else if (ach.id === 'distance_ach') {
         newProgress = Math.max(ach.progress, finalDistance);
       }
+      const newlyCompleted = newProgress >= ach.target && !ach.completed;
+      if (newlyCompleted) {
+        triggerToast('MILESTONE UNLOCKED!', ach.title, ach.rewardCoins, '🏅');
+      }
       return {
         ...ach,
         progress: newProgress,
@@ -165,6 +190,10 @@ export default function App() {
         extra = finalDistance;
       }
       const newProgress = Math.min(daily.target, daily.progress + extra);
+      const newlyCompleted = newProgress >= daily.target && !daily.completed;
+      if (newlyCompleted) {
+        triggerToast('DAILY CHALLENGE DONE!', daily.description, daily.reward, '📅');
+      }
       return {
         ...daily,
         progress: newProgress,
@@ -216,9 +245,22 @@ export default function App() {
 
   // Sync partial achievement additions in middle of run
   const handleAchievementProgress = (id: string, increment: number) => {
+    if (!saveData) return;
+
+    let toastToTrigger: { title: string; description: string; reward: number; icon: string } | null = null;
+
     const updatedAchievements = saveData.achievements.map(ach => {
       if (ach.id === id) {
         const nextProgress = Math.min(ach.target, ach.progress + increment);
+        const newlyCompleted = nextProgress >= ach.target && !ach.completed;
+        if (newlyCompleted) {
+          toastToTrigger = {
+            title: 'MILESTONE UNLOCKED!',
+            description: ach.title,
+            reward: ach.rewardCoins,
+            icon: '🏅',
+          };
+        }
         return {
           ...ach,
           progress: nextProgress,
@@ -242,6 +284,15 @@ export default function App() {
 
       if (extra > 0) {
         const nextProgress = Math.min(daily.target, daily.progress + extra);
+        const newlyCompleted = nextProgress >= daily.target && !daily.completed;
+        if (newlyCompleted && !toastToTrigger) { // prioritize milestone but fallback to daily
+          toastToTrigger = {
+            title: 'DAILY CHALLENGE DONE!',
+            description: daily.description,
+            reward: daily.reward,
+            icon: '📅',
+          };
+        }
         return {
           ...daily,
           progress: nextProgress,
@@ -258,6 +309,10 @@ export default function App() {
     };
     setSaveData(refreshedData);
     saveSaveData(refreshedData);
+
+    if (toastToTrigger) {
+      triggerToast(toastToTrigger.title, toastToTrigger.description, toastToTrigger.reward, toastToTrigger.icon);
+    }
   };
 
   // Sync real-time ticking values
@@ -501,6 +556,39 @@ export default function App() {
             targetDistance={targetDistance}
             setTargetDistance={setTargetDistance}
           />
+
+          {/* DYNAMIC REAL-TIME HUD ACHIEVEMENT TOASTS QUEUE */}
+          <div className="absolute top-[115px] right-4 z-[45] flex flex-col gap-2 max-w-[260px] w-full pointer-events-none">
+            <AnimatePresence>
+              {toasts.map((toast) => (
+                <motion.div
+                  key={toast.id}
+                  initial={{ opacity: 0, x: 80, scale: 0.85 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 80, scale: 0.9 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+                  className="flex items-center gap-2.5 bg-slate-950/95 border border-cyan-400 rounded-xl p-2.5 shadow-[0_4px_16px_rgba(6,182,212,0.35)] pointer-events-auto select-none overflow-hidden"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-400/50 text-base">
+                    {toast.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[8px] font-black font-mono tracking-wider text-cyan-300 uppercase leading-none">
+                      {toast.title}
+                    </p>
+                    <p className="text-[10.5px] font-extrabold text-white tracking-wide mt-1 leading-tight truncate">
+                      {toast.description}
+                    </p>
+                    {toast.rewardCoins && (
+                      <p className="text-[8px] font-bold font-mono text-amber-300 mt-0.5 leading-none uppercase">
+                        BOUNTY: +🪙 {toast.rewardCoins} FISH COINS
+                      </p>
+                    )}
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* INSTRUCTIONS DRAWER */}
