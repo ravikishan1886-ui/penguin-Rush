@@ -79,6 +79,7 @@ export default function GameCanvas({
     playerJumpV: 0, // jump velocity
     playerSlideTime: 0, // sliding crouch ticks left
     playerHitCooldown: 0, // invincible frames after hit
+    playerFrontViewTimer: 0, // frame ticks to show front view of penguin when jumping or landing
     trackLength: 3000, // meters to finish line
     bossSpawnDistance: 1200, // distance where boss battle triggers
     fireCooldown: 0, // weapon projectile cooldown
@@ -600,10 +601,16 @@ export default function GameCanvas({
       if (s.playerY > 0) {
         s.playerY += s.playerJumpV;
         s.playerJumpV -= 0.45; // Gravity
+        s.playerFrontViewTimer = 120; // 2 seconds of front-view during and right after a jump
         if (s.playerY <= 0) {
           s.playerY = 0;
           s.playerJumpV = 0;
         }
+      }
+
+      // Decrement front view timer when on ground
+      if (s.playerY === 0 && s.playerFrontViewTimer > 0) {
+        s.playerFrontViewTimer--;
       }
 
       // Handle Slide cooldowns
@@ -2788,6 +2795,8 @@ export default function GameCanvas({
     ctx.restore();
 
     // DRAW PENGUIN BODY
+    const showFrontView = s.playerY > 0 || s.playerFrontViewTimer > 0;
+
     // Base oval shadow
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
     ctx.beginPath();
@@ -2820,31 +2829,33 @@ export default function GameCanvas({
     ctx.closePath();
     ctx.fill();
 
-    // Emperor orange-gold throat collar gradient
-    const throatGrad = ctx.createLinearGradient(0, -h * 0.68, 0, -h * 0.42);
-    throatGrad.addColorStop(0, '#ea580c'); // warm fire-orange collar
-    throatGrad.addColorStop(0.35, '#fbbf24'); // golden yellow sunshine blend
-    throatGrad.addColorStop(0.7, selectedSkin.secondaryColor || '#f1f5f9'); // gradient down to stomach
-    throatGrad.addColorStop(1, selectedSkin.secondaryColor || '#f1f5f9');
+    if (showFrontView) {
+      // Emperor orange-gold throat collar gradient
+      const throatGrad = ctx.createLinearGradient(0, -h * 0.68, 0, -h * 0.42);
+      throatGrad.addColorStop(0, '#ea580c'); // warm fire-orange collar
+      throatGrad.addColorStop(0.35, '#fbbf24'); // golden yellow sunshine blend
+      throatGrad.addColorStop(1, selectedSkin.secondaryColor || '#f1f5f9'); // gradient down to stomach
+      throatGrad.addColorStop(1, selectedSkin.secondaryColor || '#f1f5f9');
 
-    // White gorgeous smooth breast overlay
-    ctx.fillStyle = throatGrad;
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.22, -h * 0.48);
-    ctx.bezierCurveTo(-w * 0.22, -h * 0.64, w * 0.22, -h * 0.64, w * 0.22, -h * 0.48);
-    ctx.bezierCurveTo(w * 0.33, -h * 0.22, w * 0.33, h * 0.03, 0, h * 0.04);
-    ctx.bezierCurveTo(-w * 0.33, h * 0.03, -w * 0.33, -h * 0.22, -w * 0.22, -h * 0.48);
-    ctx.closePath();
-    ctx.fill();
+      // White gorgeous smooth breast overlay
+      ctx.fillStyle = throatGrad;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.22, -h * 0.48);
+      ctx.bezierCurveTo(-w * 0.22, -h * 0.64, w * 0.22, -h * 0.64, w * 0.22, -h * 0.48);
+      ctx.bezierCurveTo(w * 0.33, -h * 0.22, w * 0.33, h * 0.03, 0, h * 0.04);
+      ctx.bezierCurveTo(-w * 0.33, h * 0.03, -w * 0.33, -h * 0.22, -w * 0.22, -h * 0.48);
+      ctx.closePath();
+      ctx.fill();
 
-    // Soft under shadow shading overlay on plump white belly for absolute high depth realism
-    const bellyShadowDef = ctx.createRadialGradient(0, h * 0.05, 0, 0, -h * 0.15, w * 0.42);
-    bellyShadowDef.addColorStop(0, 'rgba(148, 163, 184, 0.28)'); // slate shadow
-    bellyShadowDef.addColorStop(0.6, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = bellyShadowDef;
-    ctx.beginPath();
-    ctx.ellipse(0, -h * 0.16, w * 0.3, h * 0.22, 0, 0, Math.PI * 2);
-    ctx.fill();
+      // Soft under shadow shading overlay on plump white belly for absolute high depth realism
+      const bellyShadowDef = ctx.createRadialGradient(0, h * 0.05, 0, 0, -h * 0.15, w * 0.42);
+      bellyShadowDef.addColorStop(0, 'rgba(148, 163, 184, 0.28)'); // slate shadow
+      bellyShadowDef.addColorStop(0.6, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = bellyShadowDef;
+      ctx.beginPath();
+      ctx.ellipse(0, -h * 0.16, w * 0.3, h * 0.22, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Natural flapping paddle-shaped wings fanning out with realistic biological shape trim
     const wingWiggle = Math.sin(s.gameTime * 14) * 0.25;
@@ -2901,118 +2912,120 @@ export default function GameCanvas({
     ctx.stroke();
     ctx.restore();
 
-    // Elegant side golden/orange ear patches characteristic of real penguins
-    ctx.fillStyle = '#f59e0b'; // warm crown yellow
-    ctx.beginPath();
-    ctx.ellipse(-w * 0.23, -h * 0.72, w * 0.1, h * 0.11, -0.4, 0, Math.PI * 2);
-    ctx.ellipse(w * 0.23, -h * 0.72, w * 0.1, h * 0.11, 0.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#ea580c'; // fiery core glow
-    ctx.beginPath();
-    ctx.ellipse(-w * 0.21, -h * 0.71, w * 0.05, h * 0.07, -0.4, 0, Math.PI * 2);
-    ctx.ellipse(w * 0.21, -h * 0.71, w * 0.05, h * 0.07, 0.4, 0, Math.PI * 2);
-    ctx.fill();
-
-    // White gorgeous mask on face to nestle pupil sockets nicely
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(-w * 0.12, -h * 0.75, w * 0.13, 0, Math.PI * 2);
-    ctx.arc(w * 0.12, -h * 0.75, w * 0.13, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.ellipse(0, -h * 0.68, w * 0.16, h * 0.11, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Highly realistic animated eyes with depth (blue highlights & pupil scaling)
-    const eyeBlink = Math.floor(s.frameCount / 140) % 20 === 0;
-
-    if (eyeBlink) {
-      // Sleek closed lids
-      ctx.strokeStyle = '#1e293b';
-      ctx.lineWidth = 3.2 * pScale.scale;
-      ctx.lineCap = 'round';
+    if (showFrontView) {
+      // Elegant side golden/orange ear patches characteristic of real penguins
+      ctx.fillStyle = '#f59e0b'; // warm crown yellow
       ctx.beginPath();
-      ctx.moveTo(-w * 0.20, -h * 0.75);
-      ctx.lineTo(-w * 0.05, -h * 0.75);
-      ctx.moveTo(w * 0.05, -h * 0.75);
-      ctx.lineTo(w * 0.20, -h * 0.75);
+      ctx.ellipse(-w * 0.23, -h * 0.72, w * 0.1, h * 0.11, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(w * 0.23, -h * 0.72, w * 0.1, h * 0.11, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#ea580c'; // fiery core glow
+      ctx.beginPath();
+      ctx.ellipse(-w * 0.21, -h * 0.71, w * 0.05, h * 0.07, -0.4, 0, Math.PI * 2);
+      ctx.ellipse(w * 0.21, -h * 0.71, w * 0.05, h * 0.07, 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // White gorgeous mask on face to nestle pupil sockets nicely
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(-w * 0.12, -h * 0.75, w * 0.13, 0, Math.PI * 2);
+      ctx.arc(w * 0.12, -h * 0.75, w * 0.13, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(0, -h * 0.68, w * 0.16, h * 0.11, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Highly realistic animated eyes with depth (blue highlights & pupil scaling)
+      const eyeBlink = Math.floor(s.frameCount / 140) % 20 === 0;
+
+      if (eyeBlink) {
+        // Sleek closed lids
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 3.2 * pScale.scale;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.20, -h * 0.75);
+        ctx.lineTo(-w * 0.05, -h * 0.75);
+        ctx.moveTo(w * 0.05, -h * 0.75);
+        ctx.lineTo(w * 0.20, -h * 0.75);
+        ctx.stroke();
+      } else {
+        // Left Eye Depth
+        ctx.save();
+        ctx.translate(-w * 0.125, -h * 0.75);
+        // Iris shadow
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(0, 0, w * 0.075, 0, Math.PI * 2);
+        ctx.fill();
+        // Pupil core
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(0, 0, w * 0.05, 0, Math.PI * 2);
+        ctx.fill();
+        // Glistening highlight reflections
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-w * 0.02, -h * 0.02, w * 0.026, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(w * 0.022, h * 0.022, w * 0.012, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Right Eye Depth
+        ctx.save();
+        ctx.translate(w * 0.125, -h * 0.75);
+        ctx.fillStyle = '#0f172a';
+        ctx.beginPath();
+        ctx.arc(0, 0, w * 0.075, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#020617';
+        ctx.beginPath();
+        ctx.arc(0, 0, w * 0.05, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(-w * 0.02, -h * 0.02, w * 0.026, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(w * 0.022, h * 0.022, w * 0.012, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Realistic beak bill (long, sleek, downward tapers with fiery side mandible highlight)
+      const beakGrad = ctx.createLinearGradient(0, -h * 0.7, 0, -h * 0.55);
+      beakGrad.addColorStop(0, '#090d16'); // dense dark obsidian upper ridge
+      beakGrad.addColorStop(1, '#1e293b');
+      ctx.fillStyle = beakGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.09, -h * 0.68);
+      ctx.bezierCurveTo(-w * 0.03, -h * 0.68, w * 0.03, -h * 0.68, w * 0.09, -h * 0.68);
+      ctx.bezierCurveTo(w * 0.025, -h * 0.53, -w * 0.025, -h * 0.53, -w * 0.09, -h * 0.68);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bi-colored mandible stripe (Emperor species feature)
+      ctx.fillStyle = '#ea580c'; // intense vibrant red-orange bill splash
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.075, -h * 0.64);
+      ctx.lineTo(w * 0.075, -h * 0.64);
+      ctx.lineTo(0, -h * 0.53);
+      ctx.closePath();
+      ctx.fill();
+
+      // Bill shine
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1 * pScale.scale;
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.05, -h * 0.67);
+      ctx.bezierCurveTo(0, -h * 0.66, w * 0.05, -h * 0.67, w * 0.05, -h * 0.67);
       ctx.stroke();
-    } else {
-      // Left Eye Depth
-      ctx.save();
-      ctx.translate(-w * 0.125, -h * 0.75);
-      // Iris shadow
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.arc(0, 0, w * 0.075, 0, Math.PI * 2);
-      ctx.fill();
-      // Pupil core
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(0, 0, w * 0.05, 0, Math.PI * 2);
-      ctx.fill();
-      // Glistening highlight reflections
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(-w * 0.02, -h * 0.02, w * 0.026, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(w * 0.022, h * 0.022, w * 0.012, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      // Right Eye Depth
-      ctx.save();
-      ctx.translate(w * 0.125, -h * 0.75);
-      ctx.fillStyle = '#0f172a';
-      ctx.beginPath();
-      ctx.arc(0, 0, w * 0.075, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#020617';
-      ctx.beginPath();
-      ctx.arc(0, 0, w * 0.05, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(-w * 0.02, -h * 0.02, w * 0.026, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(w * 0.022, h * 0.022, w * 0.012, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     }
-
-    // Realistic beak bill (long, sleek, downward tapers with fiery side mandible highlight)
-    const beakGrad = ctx.createLinearGradient(0, -h * 0.7, 0, -h * 0.55);
-    beakGrad.addColorStop(0, '#090d16'); // dense dark obsidian upper ridge
-    beakGrad.addColorStop(1, '#1e293b');
-    ctx.fillStyle = beakGrad;
-
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.09, -h * 0.68);
-    ctx.bezierCurveTo(-w * 0.03, -h * 0.68, w * 0.03, -h * 0.68, w * 0.09, -h * 0.68);
-    ctx.bezierCurveTo(w * 0.025, -h * 0.53, -w * 0.025, -h * 0.53, -w * 0.09, -h * 0.68);
-    ctx.closePath();
-    ctx.fill();
-
-    // Bi-colored mandible stripe (Emperor species feature)
-    ctx.fillStyle = '#ea580c'; // intense vibrant red-orange bill splash
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.075, -h * 0.64);
-    ctx.lineTo(w * 0.075, -h * 0.64);
-    ctx.lineTo(0, -h * 0.53);
-    ctx.closePath();
-    ctx.fill();
-
-    // Bill shine
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-    ctx.lineWidth = 1 * pScale.scale;
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.05, -h * 0.67);
-    ctx.bezierCurveTo(0, -h * 0.66, w * 0.05, -h * 0.67, w * 0.05, -h * 0.67);
-    ctx.stroke();
 
     // Realistic webbed claws/feet sitting perfectly flat on snowboard
     // Left Foot
@@ -3101,23 +3114,35 @@ export default function GameCanvas({
       ctx.lineTo(w * 0.38, -h * 0.78 * slideYScale);
       ctx.stroke();
 
-      ctx.fillStyle = '#06b6d4'; // Cyan lenses
-      ctx.shadowColor = '#06b6d4';
-      ctx.shadowBlur = 4;
-      ctx.beginPath();
-      ctx.roundRect(-w * 0.26, -h * 0.85 * slideYScale, w * 0.21, h * 0.12, 3);
-      ctx.roundRect(w * 0.05, -h * 0.85 * slideYScale, w * 0.21, h * 0.12, 3);
-      ctx.fill();
-      ctx.shadowBlur = 0; // reset
+      if (showFrontView) {
+        ctx.fillStyle = '#06b6d4'; // Cyan lenses
+        ctx.shadowColor = '#06b6d4';
+        ctx.shadowBlur = 4;
+        ctx.beginPath();
+        ctx.roundRect(-w * 0.26, -h * 0.85 * slideYScale, w * 0.21, h * 0.12, 3);
+        ctx.roundRect(w * 0.05, -h * 0.85 * slideYScale, w * 0.21, h * 0.12, 3);
+        ctx.fill();
+        ctx.shadowBlur = 0; // reset
+      }
     } else if (hatType === 'neon_visor') {
-      // Cyber neon teal glowing eye glasses visor
-      ctx.fillStyle = 'rgba(6,182,212,0.95)';
-      ctx.shadowColor = '#22d3ee';
-      ctx.shadowBlur = 8;
-      ctx.beginPath();
-      ctx.roundRect(-w * 0.3, -h * 0.82 * slideYScale, w * 0.6, h * 0.08, 4);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      if (showFrontView) {
+        // Cyber neon teal glowing eye glasses visor
+        ctx.fillStyle = 'rgba(6,182,212,0.95)';
+        ctx.shadowColor = '#22d3ee';
+        ctx.shadowBlur = 8;
+        ctx.beginPath();
+        ctx.roundRect(-w * 0.3, -h * 0.82 * slideYScale, w * 0.6, h * 0.08, 4);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      } else {
+        // glowing band strap around the back
+        ctx.strokeStyle = '#0891b2';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.3, -h * 0.8 * slideYScale);
+        ctx.lineTo(w * 0.3, -h * 0.8 * slideYScale);
+        ctx.stroke();
+      }
     } else if (hatType === 'wizard') {
       // Starry wizard velvet purple hat
       ctx.fillStyle = '#6d28d9';

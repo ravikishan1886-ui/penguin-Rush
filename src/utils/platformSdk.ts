@@ -17,6 +17,7 @@ declare global {
     };
     CrazyGames?: {
       SDK?: {
+        environment?: string;
         game: {
           gameplayStart: () => void;
           gameplayStop: () => void;
@@ -49,6 +50,26 @@ class PlatformSDK {
 
   constructor() {
     this.detectPlatform();
+  }
+
+  private isCrazyGamesSupported(): boolean {
+    if (typeof window === 'undefined') return false;
+    if (!this.isCrazyGamesDomain()) return false;
+    const sdk = window.CrazyGames?.SDK;
+    if (!sdk) return false;
+    return sdk.environment !== 'disabled';
+  }
+
+  private isCrazyGamesDomain(): boolean {
+    if (typeof window === 'undefined') return false;
+    const host = window.location.hostname.toLowerCase();
+    return host.includes('crazygames') || host.includes('crazy.') || host.includes('crazyg.am');
+  }
+
+  private isPokiDomain(): boolean {
+    if (typeof window === 'undefined') return false;
+    const host = window.location.hostname.toLowerCase();
+    return host.includes('poki') || host.includes('poki-gdn');
   }
 
   /**
@@ -87,6 +108,16 @@ class PlatformSDK {
       }
     }
 
+    // Safety fallback: if we are not on an approved platform domain,
+    // force activePlatform to 'offline' to prevent any unwanted side effects or console warnings.
+    if (this.activePlatform === 'crazygames' && !this.isCrazyGamesDomain()) {
+      console.log('[PlatformSDK] Forcing offline mode due to non-CrazyGames domain context.');
+      this.activePlatform = 'offline';
+    } else if (this.activePlatform === 'poki' && !this.isPokiDomain()) {
+      console.log('[PlatformSDK] Forcing offline mode due to non-Poki domain context.');
+      this.activePlatform = 'offline';
+    }
+
     console.log(`[PlatformSDK] Running in mode: ${this.activePlatform.toUpperCase()}`);
   }
 
@@ -118,6 +149,10 @@ class PlatformSDK {
     if (typeof window === 'undefined') return false;
 
     if (this.activePlatform === 'poki') {
+      if (!this.isPokiDomain()) {
+        console.log('[PlatformSDK] Skipping Poki SDK injection (non-Poki domain)');
+        return true;
+      }
       if (!window.PokiSDK) {
         console.log('[PlatformSDK] Injecting Poki SDK script...');
         await this.injectScript('https://game-cdn.poki.com/scripts/v2/poki-sdk.js');
@@ -131,6 +166,10 @@ class PlatformSDK {
         console.warn('[PlatformSDK] Poki SDK init failed/adblock:', err);
       }
     } else if (this.activePlatform === 'crazygames') {
+      if (!this.isCrazyGamesDomain()) {
+        console.log('[PlatformSDK] Skipping CrazyGames SDK injection (non-CrazyGames domain)');
+        return true;
+      }
       if (!window.CrazyGames) {
         console.log('[PlatformSDK] Injecting CrazyGames SDK script...');
         await this.injectScript('https://sdk.crazygames.com/crazygames-sdk-v2.js');
@@ -163,7 +202,7 @@ class PlatformSDK {
     console.log('[PlatformSDK] Gameplay started.');
     if (this.activePlatform === 'poki' && window.PokiSDK) {
       window.PokiSDK.gameplayStart();
-    } else if (this.activePlatform === 'crazygames' && window.CrazyGames?.SDK) {
+    } else if (this.isCrazyGamesSupported() && window.CrazyGames?.SDK) {
       window.CrazyGames.SDK.game.gameplayStart();
     }
   }
@@ -175,7 +214,7 @@ class PlatformSDK {
     console.log('[PlatformSDK] Gameplay stopped.');
     if (this.activePlatform === 'poki' && window.PokiSDK) {
       window.PokiSDK.gameplayStop();
-    } else if (this.activePlatform === 'crazygames' && window.CrazyGames?.SDK) {
+    } else if (this.isCrazyGamesSupported() && window.CrazyGames?.SDK) {
       window.CrazyGames.SDK.game.gameplayStop();
     }
   }
@@ -199,7 +238,7 @@ class PlatformSDK {
           this.adRunning = false;
           onFinished();
         });
-    } else if (this.activePlatform === 'crazygames' && window.CrazyGames?.SDK) {
+    } else if (this.isCrazyGamesSupported() && window.CrazyGames?.SDK) {
       window.CrazyGames.SDK.adManager.requestAd('midgame', {
         adStarted: () => {
           this.adRunning = true;
@@ -250,7 +289,7 @@ class PlatformSDK {
           this.adRunning = false;
           onCancelled();
         });
-    } else if (this.activePlatform === 'crazygames' && window.CrazyGames?.SDK) {
+    } else if (this.isCrazyGamesSupported() && window.CrazyGames?.SDK) {
       window.CrazyGames.SDK.adManager.requestAd('rewarded', {
         adStarted: () => {
           this.adRunning = true;
@@ -279,7 +318,7 @@ class PlatformSDK {
    */
   public submitScore(score: number) {
     console.log(`[PlatformSDK] Submitting high score of ${score}`);
-    if (this.activePlatform === 'crazygames' && window.CrazyGames?.SDK) {
+    if (this.isCrazyGamesSupported() && window.CrazyGames?.SDK) {
       window.CrazyGames.SDK.leaderboard.submitScore({
         score: score,
       });

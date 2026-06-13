@@ -58,6 +58,31 @@ export default function UIOverlay({
   const [isAdPlaying, setIsAdPlaying] = useState(false);
   const [adSuccessMessage, setAdSuccessMessage] = useState<string | null>(null);
   const [dailySuccessMsg, setDailySuccessMsg] = useState<string | null>(null);
+  const [autoRestartCountdown, setAutoRestartCountdown] = useState<number | null>(null);
+
+  // Auto-restart game when game over or victory
+  useEffect(() => {
+    if (gameState === 'gameover' || gameState === 'victory') {
+      setAutoRestartCountdown(4); // 4 seconds initial so countdown shows 3, then ticks to start
+      let localCount = 4;
+      const interval = setInterval(() => {
+        localCount--;
+        if (localCount <= 0) {
+          clearInterval(interval);
+          onStartGame();
+        } else {
+          setAutoRestartCountdown(localCount);
+        }
+      }, 1000);
+
+      return () => {
+        clearInterval(interval);
+        setAutoRestartCountdown(null);
+      };
+    } else {
+      setAutoRestartCountdown(null);
+    }
+  }, [gameState, onStartGame]);
 
   // Sync state initially
   useEffect(() => {
@@ -391,6 +416,14 @@ export default function UIOverlay({
                 {gameState === 'gameover' && lastResults && (
                   <div className="bg-red-950/35 border border-red-900/30 rounded-xl p-4 my-2 text-center">
                     <p className="text-rose-400 text-sm font-semibold tracking-wider uppercase font-mono">⚡ CRASH LANDING ⚡</p>
+                    
+                    {autoRestartCountdown !== null && (
+                      <div className="mt-2.5 mb-1.5 py-1 px-3 bg-red-500/10 border border-red-500/20 rounded-lg text-[10px] font-black font-mono tracking-widest text-rose-400 flex items-center justify-center gap-2 max-w-[240px] mx-auto uppercase">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-rose-400" />
+                        <span>RESTARTING IN {autoRestartCountdown - 1}S...</span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-3 gap-2 mt-2">
                        <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
                         <span className="block text-[10px] text-slate-400 font-mono">SCORE</span>
@@ -441,6 +474,14 @@ export default function UIOverlay({
                 {gameState === 'victory' && lastResults && (
                   <div className="bg-emerald-950/35 border border-emerald-900/30 rounded-xl p-4 my-2 text-center">
                     <p className="text-emerald-400 text-sm font-semibold tracking-wider uppercase font-mono">🏆 CHAMPION OF COLD! RUNWAY COMPLETED 🏆</p>
+
+                    {autoRestartCountdown !== null && (
+                      <div className="mt-2.5 mb-1.5 py-1 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-[10px] font-black font-mono tracking-widest text-emerald-300 flex items-center justify-center gap-2 max-w-[240px] mx-auto uppercase">
+                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-300" />
+                        <span>RESTARTING IN {autoRestartCountdown - 1}S...</span>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-3 gap-2 mt-2">
                       <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
                         <span className="block text-[10px] text-slate-400 font-mono">SCORE</span>
