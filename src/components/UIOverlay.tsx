@@ -376,10 +376,19 @@ export default function UIOverlay({
                 <button
                   onClick={onToggleMute}
                   id="btn_toggle_audio"
-                  className="p-1.5 rounded-lg border border-sky-900/30 bg-slate-900/60 text-sky-400 hover:text-sky-300 hover:bg-slate-900/90 hover:scale-105 active:scale-95 transition cursor-pointer"
+                  className="p-1.5 rounded-lg border border-sky-900/30 bg-slate-900/60 text-sky-400 hover:text-sky-300 hover:bg-slate-900/90 hover:scale-105 active:scale-95 transition cursor-pointer flex items-center justify-center overflow-hidden"
                   title="Toggle Music & Sound Effects"
                 >
-                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  <motion.div
+                    animate={{ rotate: muted ? 180 : 0, scale: [1, 1.15, 1] }}
+                    transition={{
+                      rotate: { type: "spring", stiffness: 220, damping: 14 },
+                      scale: { type: "tween", duration: 0.25, ease: "easeInOut" }
+                    }}
+                    className="flex items-center justify-center pointer-events-none"
+                  >
+                    {muted ? <VolumeX className="h-4 w-4 text-rose-400" /> : <Volume2 className="h-4 w-4" />}
+                  </motion.div>
                 </button>
 
                 {activeTab !== 'menu' && (
@@ -749,10 +758,19 @@ export default function UIOverlay({
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={onToggleMute}
-                        className="p-1 rounded bg-slate-900 hover:bg-slate-850 border border-slate-800 text-sky-400 hover:text-sky-300 transition cursor-pointer"
+                        className="p-1 rounded bg-slate-900 hover:bg-slate-850 border border-slate-800 text-sky-400 hover:text-sky-300 transition cursor-pointer flex items-center justify-center overflow-hidden"
                         title="Toggle Sound & Music"
                       >
-                        {muted ? <VolumeX className="h-3.5 w-3.5 text-rose-400" /> : <Volume2 className="h-3.5 w-3.5 text-emerald-400" />}
+                        <motion.div
+                          animate={{ rotate: muted ? 180 : 0, scale: [1, 1.15, 1] }}
+                          transition={{
+                            rotate: { type: "spring", stiffness: 220, damping: 14 },
+                            scale: { type: "tween", duration: 0.25, ease: "easeInOut" }
+                          }}
+                          className="flex items-center justify-center pointer-events-none"
+                        >
+                          {muted ? <VolumeX className="h-3.5 w-3.5 text-rose-400" /> : <Volume2 className="h-3.5 w-3.5 text-emerald-400" />}
+                        </motion.div>
                       </button>
                       <button
                         onClick={handleNextTrack}

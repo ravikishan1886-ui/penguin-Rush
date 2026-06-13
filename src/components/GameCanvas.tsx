@@ -92,7 +92,10 @@ export default function GameCanvas({
     cameraShake: 0, // screenshake duration/intensity
     perspectiveFactor: 50, // default 50%
     targetDistanceOverride: null as number | null,
+    crashFrameCount: 0,
   });
+
+  const prevGameStateRef = useRef<typeof gameState | null>(null);
 
   // Sync perspectiveFactor prop with stateRef
   useEffect(() => {
@@ -106,12 +109,23 @@ export default function GameCanvas({
 
   // Sync state variables from props to ref
   useEffect(() => {
+    const prevGameState = prevGameStateRef.current;
+    prevGameStateRef.current = gameState;
+
     stateRef.current.gameState = gameState;
     stateRef.current.difficulty = difficulty;
     stateRef.current.isPaused = isPaused;
 
     // Adjust difficulty variables
-    if (gameState === 'playing' && stateRef.current.distanceTravelled === 0) {
+    const isBeginning = gameState === 'playing' && (
+      prevGameState === 'menu' ||
+      prevGameState === 'gameover' ||
+      prevGameState === 'victory' ||
+      prevGameState === null ||
+      stateRef.current.distanceTravelled === 0
+    );
+
+    if (isBeginning) {
       let baseSpeed = 6.0;
       let maxSpeed = 12.0;
 
@@ -143,6 +157,7 @@ export default function GameCanvas({
       stateRef.current.playerJumpV = 0;
       stateRef.current.playerSlideTime = 0;
       stateRef.current.playerHitCooldown = 0;
+      stateRef.current.crashFrameCount = 0;
       setBossHealth(100);
 
       obstaclesRef.current = [];
@@ -548,9 +563,37 @@ export default function GameCanvas({
       const s = stateRef.current;
       s.frameCount++;
 
+      if (s.gameState === 'gameover') {
+        s.crashFrameCount++;
+      } else {
+        s.crashFrameCount = 0;
+      }
+
       if (s.isPaused) {
         animId = requestAnimationFrame(mainLoop);
         return;
+      }
+
+      // Generate continuous slide particles on crash
+      if (s.gameState === 'gameover' && s.crashFrameCount < 60 && s.frameCount % 2 === 0) {
+        const parent = canvas;
+        if (parent) {
+          const pScale = project3D(11.2, s.playerVisualLane, s.playerY, parent.width, parent.height, s);
+          // Generate trailing snow and ice crumbs from the slide crash
+          for (let i = 0; i < 4; i++) {
+            particlesRef.current.push({
+              x: pScale.x + (Math.random() - 0.5) * 40,
+              y: pScale.y + (Math.random() - 0.5) * 12,
+              vx: (Math.random() - 0.3) * 6, // drifting sideways/back
+              vy: (Math.random() - 0.8) * 5, // flying up slightly
+              size: Math.random() * 3.5 + 1.5,
+              color: i % 2 === 0 ? '#ffffff' : '#bae6fd', // snow/ice colors
+              alpha: 0.95,
+              life: 0,
+              maxLife: Math.floor(Math.random() * 22) + 12,
+            });
+          }
+        }
       }
 
       // Game state transitions (Victory / Finish line check)
@@ -943,12 +986,12 @@ export default function GameCanvas({
 
       // 1. Coins checks
       coinsRef.current.forEach(cn => {
-        if (!cn.collected && cn.x < 11 && cn.x > 0.5) {
+        if (!cn.collected && cn.x < 13.5 && cn.x > 0.2) {
           // Coordinate depth is near player!
-          // Check horizontal coordinate tolerance
-          if (Math.abs(cn.lane - s.playerVisualLane) < 0.42) {
+          // Check horizontal coordinate tolerance (widened to make collection reliably easy and satisfying)
+          if (Math.abs(cn.lane - s.playerVisualLane) < 0.65) {
             // Check vertical coordinate tolerance
-            if (s.playerY < cn.yOffset + 18 && s.playerY + 28 > cn.yOffset) {
+            if (s.playerY < cn.yOffset + 24 && s.playerY + 28 > cn.yOffset) {
               cn.collected = true;
               s.coinsCollected += cn.isDiamond ? 5 : 1;
               s.score += cn.isDiamond ? 100 : 15;
@@ -2598,7 +2641,31 @@ export default function GameCanvas({
     const h = 55 * pScale.scale * 3.5;
 
     ctx.save();
-    ctx.translate(pScale.x, pScale.y);
+
+    let crashRotation = 0;
+    let crashYOffset = 0;
+    let crashXOffset = 0;
+    if (s.gameState === 'gameover' && s.crashFrameCount > 0) {
+      const t = s.crashFrameCount;
+      // First 40 frames: Tumble & fly in arc (jump up slightly and slide)
+      if (t < 40) {
+        // Tumble rotation: multiple spins!
+        crashRotation = t * 0.18; 
+        // Parabolic bounce arc
+        crashYOffset = -Math.sin((t / 40) * Math.PI) * h * 0.6;
+        crashXOffset = -(t * 1.5) * pScale.scale; // slide backwards
+      } else {
+        // Lay flat on their side and slide slightly
+        crashRotation = Math.PI * 0.52; // flattened on side
+        crashYOffset = h * 0.12; 
+        crashXOffset = -60 * pScale.scale; 
+      }
+    }
+
+    ctx.translate(pScale.x + crashXOffset, pScale.y + crashYOffset);
+    if (crashRotation !== 0) {
+      ctx.rotate(crashRotation);
+    }
 
     // Apply scaling / squashing jump deformation
     if (s.playerY > 0) {
@@ -2795,7 +2862,7 @@ export default function GameCanvas({
     ctx.restore();
 
     // DRAW PENGUIN BODY
-    const showFrontView = s.playerY > 0 || s.playerFrontViewTimer > 0;
+    const showFrontView = s.playerY > 0 || s.playerFrontViewTimer > 0 || s.gameState === 'gameover';
 
     // Base oval shadow
     ctx.fillStyle = 'rgba(0,0,0,0.22)';
@@ -2940,7 +3007,34 @@ export default function GameCanvas({
       // Highly realistic animated eyes with depth (blue highlights & pupil scaling)
       const eyeBlink = Math.floor(s.frameCount / 140) % 20 === 0;
 
-      if (eyeBlink) {
+      if (s.gameState === 'gameover') {
+        // Dizzy knockout "X" eyes
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3.8 * pScale.scale;
+        ctx.lineCap = 'round';
+
+        // Left Eye X
+        ctx.save();
+        ctx.translate(-w * 0.125, -h * 0.75);
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.045, -w * 0.045);
+        ctx.lineTo(w * 0.045, w * 0.045);
+        ctx.moveTo(w * 0.045, -w * 0.045);
+        ctx.lineTo(-w * 0.045, w * 0.045);
+        ctx.stroke();
+        ctx.restore();
+
+        // Right Eye X
+        ctx.save();
+        ctx.translate(w * 0.125, -h * 0.75);
+        ctx.beginPath();
+        ctx.moveTo(-w * 0.045, -w * 0.045);
+        ctx.lineTo(w * 0.045, w * 0.045);
+        ctx.moveTo(w * 0.045, -w * 0.045);
+        ctx.lineTo(-w * 0.045, w * 0.045);
+        ctx.stroke();
+        ctx.restore();
+      } else if (eyeBlink) {
         // Sleek closed lids
         ctx.strokeStyle = '#1e293b';
         ctx.lineWidth = 3.2 * pScale.scale;
@@ -3025,6 +3119,19 @@ export default function GameCanvas({
       ctx.moveTo(-w * 0.05, -h * 0.67);
       ctx.bezierCurveTo(0, -h * 0.66, w * 0.05, -h * 0.67, w * 0.05, -h * 0.67);
       ctx.stroke();
+
+      if (s.gameState === 'gameover') {
+        // Shocked/open bill interior
+        ctx.fillStyle = '#1e293b';
+        ctx.beginPath();
+        ctx.ellipse(0, -h * 0.58, w * 0.05, h * 0.038, 0, 0, Math.PI * 2);
+        ctx.fill();
+        // cute little tongue
+        ctx.fillStyle = '#fda4af'; // rose/pink tongue
+        ctx.beginPath();
+        ctx.ellipse(0, -h * 0.57, w * 0.03, h * 0.018, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     // Realistic webbed claws/feet sitting perfectly flat on snowboard
@@ -3200,6 +3307,31 @@ export default function GameCanvas({
       ctx.beginPath();
       ctx.ellipse(0, -h * 0.3, w * 0.85 + rWave, h * 0.62 + rWave, 0, 0, Math.PI * 2);
       ctx.stroke();
+    }
+
+    if (s.gameState === 'gameover' && s.crashFrameCount > 0) {
+      // Draw 3 dizzy yellow stars circling above head
+      ctx.save();
+      ctx.translate(0, -h * 1.05 * slideYScale);
+      const starSpeed = s.gameTime * 7;
+      for (let i = 0; i < 3; i++) {
+        const angle = starSpeed + (i * Math.PI * 2) / 3;
+        const sx = Math.cos(angle) * w * 0.42;
+        const sy = Math.sin(angle) * h * 0.14; // squished oval path
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(s.frameCount * 0.08);
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#fbbf24';
+        ctx.shadowColor = '#d97706';
+        ctx.shadowBlur = 6;
+        ctx.fillText('⭐', 0, 0);
+        ctx.restore();
+      }
+      ctx.restore();
     }
 
     ctx.restore();

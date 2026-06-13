@@ -438,10 +438,29 @@ export default function App() {
                 <Settings className="h-4.5 w-4.5 text-sky-200" />
               </button>
 
+              {/* Volume/Mute Toggle button */}
+              <button
+                onClick={handleToggleMute}
+                className="h-10 w-10 rounded-full border border-slate-700/50 bg-slate-950/75 hover:bg-slate-800 flex items-center justify-center text-white shadow-md transition active:scale-90 cursor-pointer overflow-hidden"
+                title="Toggle Sound & Music"
+                id="btn_hud_volume_toggle"
+              >
+                <motion.div
+                  animate={{ rotate: muted ? 180 : 0, scale: [1, 1.15, 1] }}
+                  transition={{
+                    rotate: { type: "spring", stiffness: 220, damping: 14 },
+                    scale: { type: "tween", duration: 0.25, ease: "easeInOut" }
+                  }}
+                  className="flex items-center justify-center pointer-events-none"
+                >
+                  {muted ? <VolumeX className="h-4.5 w-4.5 text-rose-400" /> : <Volume2 className="h-4.5 w-4.5 text-emerald-400" />}
+                </motion.div>
+              </button>
+
               {/* Instant Reboot button */}
               <button
                 onClick={handleRestartGame}
-                className="h-10 w-10 rounded-full border border-slate-700/50 bg-slate-950/75 hover:bg-slate-800 flex items-center justify-center text-white shadow-md transition active:scale-90 cursor-pointer"
+                className="h-10 w-10 rounded-full border border-slate-700/50 bg-slate-950/75 hover:bg-slate-850 flex items-center justify-center text-white shadow-md transition active:scale-90 cursor-pointer"
                 title="Instant Reboot"
                 id="btn_hud_reboot"
               >
