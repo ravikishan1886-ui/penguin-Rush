@@ -32,19 +32,63 @@ export default function GameCanvas({
   difficulty,
   selectedSkin,
   selectedSkateboard,
-  onGameOver,
-  onVictory,
-  onCoinCollected,
-  onPowerUpActive,
-  onAchievementProgress,
-  onStatsUpdate,
+  onGameOver: onGameOverProp,
+  onVictory: onVictoryProp,
+  onCoinCollected: onCoinCollectedProp,
+  onPowerUpActive: onPowerUpActiveProp,
+  onAchievementProgress: onAchievementProgressProp,
+  onStatsUpdate: onStatsUpdateProp,
   isPaused,
   bossHealth,
-  setBossHealth,
+  setBossHealth: setBossHealthProp,
   perspectiveFactor = 50,
   targetDistance,
   manualDistanceOverride = null,
 }: GameCanvasProps) {
+  const callbacksRef = useRef({
+    onGameOver: onGameOverProp,
+    onVictory: onVictoryProp,
+    onCoinCollected: onCoinCollectedProp,
+    onPowerUpActive: onPowerUpActiveProp,
+    onAchievementProgress: onAchievementProgressProp,
+    onStatsUpdate: onStatsUpdateProp,
+    setBossHealth: setBossHealthProp,
+  });
+
+  // Ensure refs are synced every render
+  callbacksRef.current = {
+    onGameOver: onGameOverProp,
+    onVictory: onVictoryProp,
+    onCoinCollected: onCoinCollectedProp,
+    onPowerUpActive: onPowerUpActiveProp,
+    onAchievementProgress: onAchievementProgressProp,
+    onStatsUpdate: onStatsUpdateProp,
+    setBossHealth: setBossHealthProp,
+  };
+
+  // Shadow the original names so that all existing code in this large file remains unmodified
+  const onGameOver = (finalScore: number, finalDistance: number, collectedCoins: number) => {
+    callbacksRef.current.onGameOver(finalScore, finalDistance, collectedCoins);
+  };
+  const onVictory = (finalScore: number, finalDistance: number, collectedCoins: number) => {
+    callbacksRef.current.onVictory(finalScore, finalDistance, collectedCoins);
+  };
+  const onCoinCollected = (isDiamond: boolean) => {
+    callbacksRef.current.onCoinCollected(isDiamond);
+  };
+  const onPowerUpActive = (type: PowerUpType) => {
+    callbacksRef.current.onPowerUpActive(type);
+  };
+  const onAchievementProgress = (id: string, progress: number) => {
+    callbacksRef.current.onAchievementProgress(id, progress);
+  };
+  const onStatsUpdate = (distance: number, coins: number, score: number) => {
+    callbacksRef.current.onStatsUpdate(distance, coins, score);
+  };
+  const setBossHealth = (val: React.SetStateAction<number> | number) => {
+    callbacksRef.current.setBossHealth(val as React.SetStateAction<number>);
+  };
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Core gameplay states
@@ -269,7 +313,7 @@ export default function GameCanvas({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedSkateboard, onAchievementProgress, onGameOver]);
+  }, [selectedSkateboard]);
 
   // Mobile Swipe and Tap controller with immediate response in touchMove
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -608,7 +652,7 @@ export default function GameCanvas({
         s.gameState = 'victory';
         gameAudio.setMute(true); // mute game audio loop
         const finalCoins = s.coinsCollected;
-        const totalScore = s.score + finalCoins * 15;
+        const totalScore = s.score;
         onVictory(totalScore, Math.floor(s.distanceTravelled), finalCoins);
       }
 
@@ -993,8 +1037,13 @@ export default function GameCanvas({
             // Check vertical coordinate tolerance
             if (s.playerY < cn.yOffset + 24 && s.playerY + 28 > cn.yOffset) {
               cn.collected = true;
-              s.coinsCollected += cn.isDiamond ? 5 : 1;
-              s.score += cn.isDiamond ? 100 : 15;
+              const doubleActive = powerUpsRef.current.some(p => p.type === 'double');
+              const baseCoins = cn.isDiamond ? 5 : 1;
+              const coinsToEarn = baseCoins * (doubleActive ? 2 : 1);
+              const scoreToEarn = (cn.isDiamond ? 100 : 15) * (doubleActive ? 2 : 1);
+
+              s.coinsCollected += coinsToEarn;
+              s.score += scoreToEarn;
 
               if (cn.isDiamond) {
                 gameAudio.playDiamond();
@@ -1004,8 +1053,7 @@ export default function GameCanvas({
                 gameAudio.playCoin();
                 onCoinCollected(false);
               }
-              onAchievementProgress('collect_coins', 1);
-              onAchievementProgress('daily_coins', 1);
+              onAchievementProgress('collect_coins', coinsToEarn);
 
               // spark ring
               createExplosion(cn.x, cn.lane, 6, cn.isDiamond ? '#22d3ee' : '#fbbf24');
@@ -1114,7 +1162,7 @@ export default function GameCanvas({
       gameAudio.stopMusic();
 
       const finalCoins = s.coinsCollected;
-      const totalScore = s.score + finalCoins * 15;
+      const totalScore = s.score;
       onGameOver(totalScore, Math.floor(s.distanceTravelled), finalCoins);
     };
 

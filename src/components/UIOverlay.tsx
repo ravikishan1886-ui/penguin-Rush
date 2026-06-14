@@ -60,29 +60,15 @@ export default function UIOverlay({
   const [dailySuccessMsg, setDailySuccessMsg] = useState<string | null>(null);
   const [autoRestartCountdown, setAutoRestartCountdown] = useState<number | null>(null);
 
-  // Auto-restart game when game over or victory
-  useEffect(() => {
-    if (gameState === 'gameover' || gameState === 'victory') {
-      setAutoRestartCountdown(4); // 4 seconds initial so countdown shows 3, then ticks to start
-      let localCount = 4;
-      const interval = setInterval(() => {
-        localCount--;
-        if (localCount <= 0) {
-          clearInterval(interval);
-          onStartGame();
-        } else {
-          setAutoRestartCountdown(localCount);
-        }
-      }, 1000);
+  const [isDoubleClaimed, setIsDoubleClaimed] = useState(false);
 
-      return () => {
-        clearInterval(interval);
-        setAutoRestartCountdown(null);
-      };
-    } else {
-      setAutoRestartCountdown(null);
+  // No auto-restart game when game over or victory so player can read popup stats, double rewards, etc.
+  useEffect(() => {
+    setAutoRestartCountdown(null);
+    if (gameState === 'playing' || gameState === 'menu') {
+      setIsDoubleClaimed(false);
     }
-  }, [gameState, onStartGame]);
+  }, [gameState]);
 
   // Sync state initially
   useEffect(() => {
@@ -129,7 +115,7 @@ export default function UIOverlay({
   };
 
   const handleDoubleCoinsAd = () => {
-    if (!lastResults) return;
+    if (!lastResults || isDoubleClaimed) return;
     setIsAdPlaying(true);
     setAdSuccessMessage(null);
     const wasMuted = gameAudio.getMuted();
@@ -153,6 +139,7 @@ export default function UIOverlay({
         localStorage.setItem('penguin_rush_save_data', JSON.stringify(newData));
 
         setAdSuccessMessage(`🪙 +${bonus} EXTRA FISH COINS CLAIMED SUCCESSFULLY!`);
+        setIsDoubleClaimed(true);
         setTimeout(() => setAdSuccessMessage(null), 4500);
       },
       () => {
@@ -337,6 +324,7 @@ export default function UIOverlay({
     };
     setSaveData(newData);
     localStorage.setItem('penguin_rush_save_data', JSON.stringify(newData));
+    onResetGame(); // Close the gameover popup modal and return to menu
     setActiveTab('leaderboard');
   };
 
@@ -344,7 +332,7 @@ export default function UIOverlay({
     <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-4 Pointer-events-none md:p-6" id="ui_overlay_main">
       <AnimatePresence mode="wait">
         {/* MENU / OVERLAYS CONTAINER */}
-        {(gameState === 'menu' || gameState === 'gameover' || gameState === 'victory') && (
+        {gameState === 'menu' && (
           <motion.div
             key="overlay_menu"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -420,123 +408,6 @@ export default function UIOverlay({
                     ❄️ Frozen City Cyber-Run ❄️
                   </p>
                 </div>
-
-                {/* GAME SESSION FEEDBACK LAST RESULTS */}
-                {gameState === 'gameover' && lastResults && (
-                  <div className="bg-red-950/35 border border-red-900/30 rounded-xl p-4 my-2 text-center">
-                    <p className="text-rose-400 text-sm font-semibold tracking-wider uppercase font-mono">⚡ CRASH LANDING ⚡</p>
-                    
-                    {autoRestartCountdown !== null && (
-                      <div className="mt-2.5 mb-1.5 py-1 px-3 bg-red-500/10 border border-red-500/20 rounded-lg text-[10px] font-black font-mono tracking-widest text-rose-400 flex items-center justify-center gap-2 max-w-[240px] mx-auto uppercase">
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-rose-400" />
-                        <span>RESTARTING IN {autoRestartCountdown - 1}S...</span>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                       <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
-                        <span className="block text-[10px] text-slate-400 font-mono">SCORE</span>
-                        <span className="text-lg font-bold font-mono text-cyan-300">{lastResults.score}</span>
-                      </div>
-                      <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
-                        <span className="block text-[10px] text-slate-400 font-mono">DISTANCE</span>
-                        <span className="text-lg font-bold font-mono text-sky-300">{lastResults.distance}m</span>
-                      </div>
-                      <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
-                        <span className="block text-[10px] text-slate-400 font-mono">COINS COp</span>
-                        <span className="text-lg font-bold font-mono text-amber-300">🪙 {lastResults.coins}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-3 max-w-sm mx-auto">
-                      <button
-                        onClick={handleDoubleCoinsAd}
-                        disabled={isAdPlaying || lastResults.coins === 0}
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-white font-extrabold text-xs font-mono tracking-widest py-2 px-3 rounded-xl border border-yellow-300/30 hover:scale-[1.02] transition cursor-pointer"
-                        title="Double your runway coins with a short sponsor message"
-                      >
-                        <Video className="h-4 w-4 text-white animate-pulse" />
-                        <span>DOUBLE COINS (+{lastResults.coins})</span>
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleSaveToLeaderboard} className="mt-4 flex items-center justify-center gap-2 max-w-sm mx-auto">
-                      <input
-                        type="text"
-                        maxLength={14}
-                        value={playerNameInput}
-                        onChange={(e) => setPlayerNameInput(e.target.value)}
-                        placeholder="Your Skater Name"
-                        className="flex-1 bg-slate-900 border border-sky-800/50 rounded-lg px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-cyan-400"
-                        required
-                      />
-                      <button
-                        type="submit"
-                        className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
-                      >
-                        Submit Score
-                      </button>
-                    </form>
-                  </div>
-                )}
-
-                {gameState === 'victory' && lastResults && (
-                  <div className="bg-emerald-950/35 border border-emerald-900/30 rounded-xl p-4 my-2 text-center">
-                    <p className="text-emerald-400 text-sm font-semibold tracking-wider uppercase font-mono">🏆 CHAMPION OF COLD! RUNWAY COMPLETED 🏆</p>
-
-                    {autoRestartCountdown !== null && (
-                      <div className="mt-2.5 mb-1.5 py-1 px-3 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-[10px] font-black font-mono tracking-widest text-emerald-300 flex items-center justify-center gap-2 max-w-[240px] mx-auto uppercase">
-                        <RefreshCw className="h-3.5 w-3.5 animate-spin text-emerald-300" />
-                        <span>RESTARTING IN {autoRestartCountdown - 1}S...</span>
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-3 gap-2 mt-2">
-                      <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
-                        <span className="block text-[10px] text-slate-400 font-mono">SCORE</span>
-                        <span className="text-lg font-bold font-mono text-emerald-300">{lastResults.score}</span>
-                      </div>
-                      <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
-                        <span className="block text-[10px] text-slate-400 font-mono">FLAWLESS DIST</span>
-                        <span className="text-lg font-bold font-mono text-sky-400">{lastResults.distance}m</span>
-                      </div>
-                      <div className="p-2 bg-slate-900/50 rounded border border-slate-800/40">
-                        <span className="block text-[10px] text-slate-400 font-mono">BONUS COINS</span>
-                        <span className="text-lg font-bold font-mono text-amber-300">🪙 {lastResults.coins}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row items-center justify-center gap-2 mt-3 max-w-sm mx-auto">
-                      <button
-                        onClick={handleDoubleCoinsAd}
-                        disabled={isAdPlaying || lastResults.coins === 0}
-                        className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-white font-extrabold text-xs font-mono tracking-widest py-2 px-3 rounded-xl border border-yellow-300/30 hover:scale-[1.02] transition cursor-pointer"
-                        title="Double your runway reward with a short sponsor message"
-                      >
-                        <Video className="h-4 w-4 text-white animate-pulse" />
-                        <span>DOUBLE REWARDS (+{lastResults.coins})</span>
-                      </button>
-                    </div>
-
-                    <form onSubmit={handleSaveToLeaderboard} className="mt-4 flex items-center justify-center gap-2 max-w-sm mx-auto">
-                      <input
-                        type="text"
-                        maxLength={14}
-                        value={playerNameInput}
-                        onChange={(e) => setPlayerNameInput(e.target.value)}
-                        placeholder="Champion Name"
-                        className="flex-1 bg-slate-900 border border-emerald-800/50 rounded-lg px-3 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-emerald-400"
-                        required
-                      />
-                      <button
-                        type="submit"
-                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition"
-                      >
-                        Save Victory
-                      </button>
-                    </form>
-                  </div>
-                )}
 
                 {/* PORTFOLIO-GRADE CONSECUTIVE DAILY LOYALTY CALENDAR */}
                 {(() => {
@@ -1148,6 +1019,200 @@ export default function UIOverlay({
                 </div>
               </div>
             )}
+          </motion.div>
+        )}
+
+        {/* GAME OVER & VICTORY DEDICATED POPUP MODAL */}
+        {(gameState === 'gameover' || gameState === 'victory') && lastResults && (
+          <motion.div
+            key="game_end_dedicated_popup"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 30 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 30 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className={`relative flex flex-col w-full max-w-md max-h-[95%] overflow-y-auto rounded-3xl border p-5 md:p-7 shadow-2xl ${
+                gameState === 'gameover'
+                  ? 'border-rose-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-rose-950/20'
+                  : 'border-cyan-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-cyan-950/20'
+              }`}
+            >
+              <div className="flex flex-col items-center gap-1.5 text-center">
+                {gameState === 'gameover' ? (
+                  <>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 border border-rose-500 text-3xl animate-bounce">
+                      💥🐧
+                    </div>
+                    <span className="bg-rose-500/15 border border-rose-500/20 text-rose-400 font-mono tracking-widest text-[9px] py-1 px-3.5 rounded-full inline-block mt-1 uppercase font-bold">
+                      Cyber Runway Crashed
+                    </span>
+                    <h2 className="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-red-400 via-rose-300 to-amber-500 uppercase font-display mt-2 leading-tight">
+                      Wipe Out!
+                    </h2>
+                    <p className="text-xs text-slate-400 font-mono tracking-wide max-w-xs mt-1">
+                      You benched an electrostatic ice obstacle! Salvaged valuable coin debris before landing.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-400 text-3xl animate-bounce">
+                      👑🏂
+                    </div>
+                    <span className="bg-emerald-500/15 border border-emerald-500/20 text-emerald-400 font-mono tracking-widest text-[9px] py-1 px-3.5 rounded-full inline-block mt-1 uppercase font-bold">
+                      Runway Route Conquered
+                    </span>
+                    <h2 className="text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400 uppercase font-display mt-2 leading-tight">
+                      Expedition Clear!
+                    </h2>
+                    <p className="text-xs text-slate-400 font-mono tracking-wide max-w-xs mt-1">
+                      Outstanding navigation! You carved through the howling cyber blizzard safely.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              {/* STATS INFOGRAPHIC ROW/GRID */}
+              <div className="grid grid-cols-3 gap-2.5 mt-5">
+                <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center relative overflow-hidden flex flex-col justify-center min-h-[96px]">
+                  <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase">Run Score</span>
+                  <span className={`text-xl font-mono font-black mt-1 ${gameState === 'gameover' ? 'text-red-400' : 'text-emerald-400'}`}>
+                    {lastResults.score}
+                  </span>
+                  {lastResults.score >= saveData.highScore && (
+                    <div className="absolute top-1 right-1">
+                      <span className="text-[7px] bg-amber-500/25 text-amber-300 border border-amber-500/30 px-1 py-0.5 rounded-full font-mono font-bold leading-none">
+                        BEST
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center flex flex-col justify-center min-h-[96px]">
+                  <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase">Distance</span>
+                  <span className="text-xl font-mono font-black text-cyan-300 mt-1">
+                    {lastResults.distance}m
+                  </span>
+                  <span className="text-[8px] text-slate-500 font-mono mt-0.5 font-bold">
+                    {targetDistance === -1 ? 'Endless' : `of ${targetDistance}m`}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center flex flex-col justify-center min-h-[96px]">
+                  <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase">Salvage</span>
+                  <span className="text-xl font-mono font-black text-amber-300 mt-1">
+                    🪙 {lastResults.coins}
+                  </span>
+                  <span className="text-[8px] text-amber-400/80 font-mono mt-0.5 font-bold">
+                    Caught
+                  </span>
+                </div>
+              </div>
+
+              {/* DOUBLE REWARDS BOOSTER AD BANNER */}
+              {lastResults.coins > 0 ? (
+                <div className="mt-4 p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-transparent border border-yellow-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <div className="flex flex-col text-center sm:text-left">
+                    <span className="text-xs font-bold text-amber-300 flex items-center justify-center sm:justify-start gap-1 font-mono tracking-wide">
+                      <Sparkles className="h-3.5 w-3.5 text-amber-400 animate-pulse" /> SPONSOR AD BOOST
+                    </span>
+                    <span className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      {isDoubleClaimed 
+                        ? "Reward claimed! Your runway coins have been doubled." 
+                        : `Watch a premium ad slot to double your current salvage (+${lastResults.coins} coins!)`
+                      }
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleDoubleCoinsAd}
+                    disabled={isAdPlaying || isDoubleClaimed}
+                    className="shrink-0 w-full sm:w-auto flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-450 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-slate-950 font-black text-[10px] font-mono tracking-widest py-2 px-3.5 rounded-xl shadow-lg border border-yellow-300/40 disabled:border-slate-800/40 cursor-pointer disabled:cursor-not-allowed hover:scale-[1.03] active:scale-95 disabled:scale-100 transition"
+                  >
+                    <Video className="h-4 w-4 shrink-0" />
+                    <span>{isDoubleClaimed ? 'CLAIMED' : 'DOUBLE IT'}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 p-3 bg-slate-900/35 border border-slate-800/50 rounded-2xl text-center">
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    💡 Tip: Collect more Gold and Diamond coins along the tracks to load up on Salvage multipliers next run!
+                  </p>
+                </div>
+              )}
+
+              {/* RECORD NAME STATS LEADERBOARD FORM */}
+              <div className="mt-4 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/40 flex flex-col gap-2">
+                <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase text-center font-bold">
+                  ✒️ INSCRIBE ARCHIVE SCORE HISTORIES
+                </span>
+                <form onSubmit={handleSaveToLeaderboard} className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={14}
+                    value={playerNameInput}
+                    onChange={(e) => setPlayerNameInput(e.target.value)}
+                    placeholder="Skaters Chronicle Name"
+                    className="flex-1 bg-slate-900 border border-slate-800/60 rounded-xl px-3.5 py-1.5 font-mono text-xs text-white focus:outline-none focus:border-cyan-400 transition"
+                    required
+                  />
+                  <button
+                    type="submit"
+                    className="bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl shadow transition cursor-pointer"
+                  >
+                    Post Score
+                  </button>
+                </form>
+              </div>
+
+              {/* EXTRA ADVENTURE ACTIVE CHALLENGES TRACKER */}
+              <div className="mt-4 border-t border-slate-800/50 pt-3.5 flex flex-col gap-2">
+                <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase text-center font-bold">
+                  📊 EXPEDITION CHALLENGES STATUS
+                </span>
+                <div className="flex flex-col gap-1.5 max-h-[100px] overflow-y-auto pr-1">
+                  {saveData.dailyChallenges.slice(0, 2).map((daily) => {
+                    const isCompleted = daily.progress >= daily.target;
+                    const ratio = Math.min(100, (daily.progress / daily.target) * 100);
+                    return (
+                      <div key={daily.id} className="p-2 rounded-xl bg-slate-900/20 border border-slate-900/50 text-left flex items-center justify-between text-xs">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="text-[10px] text-slate-400 truncate leading-none">{daily.description}</p>
+                          <div className="mt-1.5 h-1 w-full bg-slate-950 rounded-full overflow-hidden">
+                            <div className={`h-full rounded-full ${isCompleted ? 'bg-purple-500/80 animate-pulse' : 'bg-sky-500'}`} style={{ width: `${ratio}%` }} />
+                          </div>
+                        </div>
+                        <span className={`font-mono text-[9px] shrink-0 font-extrabold ${isCompleted ? 'text-purple-400' : 'text-slate-400'}`}>
+                          {isCompleted ? '✅ CLEARED' : `${Math.floor(daily.progress)}/${daily.target}`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* CORE PRIMARY CONTROL ACTIONS */}
+              <div className="grid grid-cols-2 gap-3 mt-5">
+                <button
+                  onClick={onStartGame}
+                  className="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 via-cyan-400 to-indigo-500 p-3 rounded-xl text-white font-black text-xs tracking-wider uppercase border border-sky-300/10 shadow-lg cursor-pointer hover:from-sky-400 hover:to-indigo-400 hover:scale-[1.02] active:scale-95 transition"
+                >
+                  <Play className="h-4 w-4 shrink-0" />
+                  <span>PLAY AGAIN</span>
+                </button>
+
+                <button
+                  onClick={onResetGame}
+                  className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white border border-slate-800/60 p-3 rounded-xl text-xs font-black tracking-wider uppercase transition cursor-pointer"
+                >
+                  <X className="h-4 w-4 shrink-0" />
+                  <span>MAIN MENU</span>
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
