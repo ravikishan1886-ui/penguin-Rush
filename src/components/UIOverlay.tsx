@@ -1029,14 +1029,14 @@ export default function UIOverlay({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="pointer-events-auto fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md"
+            className="pointer-events-auto fixed inset-0 z-50 flex flex-col items-center justify-start sm:justify-center overflow-y-auto p-4 bg-slate-950/85 backdrop-blur-md"
           >
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 30 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 30 }}
               transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-              className={`relative flex flex-col w-full max-w-md max-h-[95%] overflow-y-auto rounded-3xl border p-5 md:p-7 shadow-2xl ${
+              className={`relative flex flex-col w-full max-w-md my-auto rounded-3xl border p-4 sm:p-6 md:p-7 shadow-2xl ${
                 gameState === 'gameover'
                   ? 'border-rose-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-rose-950/20'
                   : 'border-cyan-500/50 bg-gradient-to-b from-slate-900 to-slate-950 shadow-cyan-950/20'
@@ -1077,10 +1077,10 @@ export default function UIOverlay({
               </div>
 
               {/* STATS INFOGRAPHIC ROW/GRID */}
-              <div className="grid grid-cols-3 gap-2.5 mt-5">
-                <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center relative overflow-hidden flex flex-col justify-center min-h-[96px]">
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                <div className="p-2 sm:p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center relative overflow-hidden flex flex-col justify-center min-h-[84px] sm:min-h-[96px]">
                   <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase">Run Score</span>
-                  <span className={`text-xl font-mono font-black mt-1 ${gameState === 'gameover' ? 'text-red-400' : 'text-emerald-400'}`}>
+                  <span className={`text-lg sm:text-xl font-mono font-black mt-0.5 ${gameState === 'gameover' ? 'text-red-400' : 'text-emerald-400'}`}>
                     {lastResults.score}
                   </span>
                   {lastResults.score >= saveData.highScore && (
@@ -1092,22 +1092,22 @@ export default function UIOverlay({
                   )}
                 </div>
 
-                <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center flex flex-col justify-center min-h-[96px]">
+                <div className="p-2 sm:p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center flex flex-col justify-center min-h-[84px] sm:min-h-[96px]">
                   <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase">Distance</span>
-                  <span className="text-xl font-mono font-black text-cyan-300 mt-1">
+                  <span className="text-lg sm:text-xl font-mono font-black text-cyan-300 mt-0.5">
                     {lastResults.distance}m
                   </span>
-                  <span className="text-[8px] text-slate-500 font-mono mt-0.5 font-bold">
+                  <span className="text-[7px] sm:text-[8px] text-slate-500 font-mono mt-0.5 font-bold">
                     {targetDistance === -1 ? 'Endless' : `of ${targetDistance}m`}
                   </span>
                 </div>
 
-                <div className="p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center flex flex-col justify-center min-h-[96px]">
+                <div className="p-2 sm:p-3 bg-slate-900/40 border border-slate-800/60 rounded-2xl text-center flex flex-col justify-center min-h-[84px] sm:min-h-[96px]">
                   <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase">Salvage</span>
-                  <span className="text-xl font-mono font-black text-amber-300 mt-1">
+                  <span className="text-lg sm:text-xl font-mono font-black text-amber-300 mt-0.5">
                     🪙 {lastResults.coins}
                   </span>
-                  <span className="text-[8px] text-amber-400/80 font-mono mt-0.5 font-bold">
+                  <span className="text-[7px] sm:text-[8px] text-amber-400/80 font-mono mt-0.5 font-bold">
                     Caught
                   </span>
                 </div>
@@ -1115,12 +1115,12 @@ export default function UIOverlay({
 
               {/* DOUBLE REWARDS BOOSTER AD BANNER */}
               {lastResults.coins > 0 ? (
-                <div className="mt-4 p-3 bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-transparent border border-yellow-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div className="mt-3 p-2.5 bg-gradient-to-r from-amber-500/10 via-yellow-500/5 to-transparent border border-yellow-500/20 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-2.5">
                   <div className="flex flex-col text-center sm:text-left">
                     <span className="text-xs font-bold text-amber-300 flex items-center justify-center sm:justify-start gap-1 font-mono tracking-wide">
                       <Sparkles className="h-3.5 w-3.5 text-amber-400 animate-pulse" /> SPONSOR AD BOOST
                     </span>
-                    <span className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                    <span className="text-[10px] text-slate-400 mt-0.5 leading-relaxed">
                       {isDoubleClaimed 
                         ? "Reward claimed! Your runway coins have been doubled." 
                         : `Watch a premium ad slot to double your current salvage (+${lastResults.coins} coins!)`
@@ -1130,22 +1130,22 @@ export default function UIOverlay({
                   <button
                     onClick={handleDoubleCoinsAd}
                     disabled={isAdPlaying || isDoubleClaimed}
-                    className="shrink-0 w-full sm:w-auto flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-450 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-slate-950 font-black text-[10px] font-mono tracking-widest py-2 px-3.5 rounded-xl shadow-lg border border-yellow-300/40 disabled:border-slate-800/40 cursor-pointer disabled:cursor-not-allowed hover:scale-[1.03] active:scale-95 disabled:scale-100 transition"
+                    className="shrink-0 w-full sm:w-auto flex items-center justify-center gap-1.5 bg-gradient-to-r from-amber-500 to-yellow-500 hover:from-amber-400 hover:to-yellow-450 disabled:from-slate-800 disabled:to-slate-800 disabled:text-slate-500 text-slate-950 font-black text-[10px] font-mono tracking-widest py-1.5 px-3 rounded-xl shadow-lg border border-yellow-300/40 disabled:border-slate-800/40 cursor-pointer disabled:cursor-not-allowed hover:scale-[1.03] active:scale-95 disabled:scale-100 transition"
                   >
                     <Video className="h-4 w-4 shrink-0" />
                     <span>{isDoubleClaimed ? 'CLAIMED' : 'DOUBLE IT'}</span>
                   </button>
                 </div>
               ) : (
-                <div className="mt-4 p-3 bg-slate-900/35 border border-slate-800/50 rounded-2xl text-center">
-                  <p className="text-[11px] text-slate-400 font-mono">
+                <div className="mt-3 p-2.5 bg-slate-900/35 border border-slate-800/50 rounded-2xl text-center">
+                  <p className="text-[10px] text-slate-400 font-mono">
                     💡 Tip: Collect more Gold and Diamond coins along the tracks to load up on Salvage multipliers next run!
                   </p>
                 </div>
               )}
 
               {/* RECORD NAME STATS LEADERBOARD FORM */}
-              <div className="mt-4 p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/40 flex flex-col gap-2">
+              <div className="mt-3 p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800/40 flex flex-col gap-1.5">
                 <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase text-center font-bold">
                   ✒️ INSCRIBE ARCHIVE SCORE HISTORIES
                 </span>
@@ -1169,19 +1169,19 @@ export default function UIOverlay({
               </div>
 
               {/* EXTRA ADVENTURE ACTIVE CHALLENGES TRACKER */}
-              <div className="mt-4 border-t border-slate-800/50 pt-3.5 flex flex-col gap-2">
+              <div className="mt-3 border-t border-slate-800/50 pt-3 flex flex-col gap-1.5">
                 <span className="block text-[8px] text-slate-400 font-mono tracking-wider uppercase text-center font-bold">
                   📊 EXPEDITION CHALLENGES STATUS
                 </span>
-                <div className="flex flex-col gap-1.5 max-h-[100px] overflow-y-auto pr-1">
+                <div className="flex flex-col gap-1 w-full">
                   {saveData.dailyChallenges.slice(0, 2).map((daily) => {
                     const isCompleted = daily.progress >= daily.target;
                     const ratio = Math.min(100, (daily.progress / daily.target) * 100);
                     return (
-                      <div key={daily.id} className="p-2 rounded-xl bg-slate-900/20 border border-slate-900/50 text-left flex items-center justify-between text-xs">
+                      <div key={daily.id} className="p-1.5 rounded-xl bg-slate-900/20 border border-slate-900/50 text-left flex items-center justify-between text-xs">
                         <div className="flex-1 min-w-0 pr-2">
                           <p className="text-[10px] text-slate-400 truncate leading-none">{daily.description}</p>
-                          <div className="mt-1.5 h-1 w-full bg-slate-950 rounded-full overflow-hidden">
+                          <div className="mt-1 h-1 w-full bg-slate-950 rounded-full overflow-hidden">
                             <div className={`h-full rounded-full ${isCompleted ? 'bg-purple-500/80 animate-pulse' : 'bg-sky-500'}`} style={{ width: `${ratio}%` }} />
                           </div>
                         </div>
@@ -1195,7 +1195,7 @@ export default function UIOverlay({
               </div>
 
               {/* CORE PRIMARY CONTROL ACTIONS */}
-              <div className="grid grid-cols-2 gap-3 mt-5">
+              <div className="grid grid-cols-2 gap-2.5 mt-4">
                 <button
                   onClick={onStartGame}
                   className="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 via-cyan-400 to-indigo-500 p-3 rounded-xl text-white font-black text-xs tracking-wider uppercase border border-sky-300/10 shadow-lg cursor-pointer hover:from-sky-400 hover:to-indigo-400 hover:scale-[1.02] active:scale-95 transition"
